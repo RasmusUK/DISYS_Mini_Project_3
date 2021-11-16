@@ -4,6 +4,7 @@ import (
 	gRPC "DISYS_Mini_Project_3/gRPC"
 	"context"
 	"errors"
+	"fmt"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -24,6 +25,10 @@ func main() {
 
 func readArgs() string {
 	if len(os.Args) > 1 {
+		if len(os.Args[1]) != 2 {
+			fmt.Println("Please start server with a valid input: 0-99 fx 01, 02, 03 ...")
+			os.Exit(1)
+		}
 		return os.Args[1]
 	} else {
 		return "localhost:8100"
