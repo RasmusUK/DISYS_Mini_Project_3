@@ -8,35 +8,26 @@ import (
 	"google.golang.org/grpc"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"time"
 )
 
 var highestBid int32 = 0
 var highestBidder string
-var biddersLogicalTime map[string]int32
+var biddersLogicalTime = make(map[string]int32)
 var auctionIsActive bool = false
 
 func main() {
-	input := readArgs()
-	initServer(input)
-}
-
-func readArgs() string {
-	if len(os.Args) > 1 {
-		if len(os.Args[1]) != 2 {
-			fmt.Println("Please start server with a valid input: 0-99 fx 01, 02, 03 ...")
-			os.Exit(1)
-		}
-		return os.Args[1]
-	} else {
-		return "localhost:8100"
-	}
+	initServer()
+	time.Sleep(time.Hour)
 }
 
 type server struct {
 	gRPC.UnsafeBidAuctionClientFEServer
+}
+
+func (s server) Ping(ctx context.Context, empty *gRPC.Empty) (*gRPC.Empty, error) {
+	return &gRPC.Empty{}, nil
 }
 
 func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*gRPC.BidResponse, error) {
@@ -44,14 +35,12 @@ func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*
 		auctionIsActive = true
 		go auctionTime()
 	}
-
 	waitForYourTurn(request.ClientID, request.RequestID)
+	biddersLogicalTime[request.ClientID] = request.RequestID
 
 	if !auctionIsActive {
 		return &gRPC.BidResponse{Success: false}, errors.New("auction is over")
 	}
-
-	biddersLogicalTime[request.ClientID] = request.RequestID
 
 	if request.Amount > highestBid {
 		highestBid = request.Amount
@@ -63,13 +52,14 @@ func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*
 
 func (s server) SendResultRequest(ctx context.Context, request *gRPC.ResultRequest) (*gRPC.ResultResponse, error) {
 	waitForYourTurn(request.ClientID, request.RequestID)
+	biddersLogicalTime[request.ClientID] = request.RequestID
 
 	if highestBid == 0 {
 		return nil, errors.New("no bids has been made")
 	}
 
-	index := getIndexOfBidder(highestBidder)
-	result := "Client " + strconv.Itoa(index) + "amount: " + strconv.Itoa(int(highestBid))
+	name := highestBidder[:3]
+	result := "Client " + name + " amount: " + strconv.Itoa(int(highestBid))
 
 	return &gRPC.ResultResponse{
 		Result: result,
@@ -77,11 +67,17 @@ func (s server) SendResultRequest(ctx context.Context, request *gRPC.ResultReque
 	}, nil
 }
 
-func initServer(connectionString string) {
-	lis, err := net.Listen("tcp", connectionString)
-	if err != nil {
-		log.Fatalf("failed to listen: %v\nPlease try another port", err)
+func initServer() {
+	var lis net.Listener
+	err := errors.New("not initiated yet")
+	baseString := "localhost:80"
+	counter := 10
+	for err != nil && counter < 100 {
+		connectionString := baseString + strconv.Itoa(counter)
+		lis, err = net.Listen("tcp", connectionString)
+		counter++
 	}
+
 	s := grpc.NewServer()
 	gRPC.RegisterBidAuctionClientFEServer(s, &server{})
 	log.Printf("server listening at %v", lis.Addr())
@@ -91,23 +87,14 @@ func initServer(connectionString string) {
 }
 
 func auctionTime() {
-	time.Sleep(time.Minute * 2)
+	fmt.Println("Auction is started")
+	time.Sleep(time.Minute * 1)
 	auctionIsActive = false
+	fmt.Println("Auction is done")
 }
 
 func waitForYourTurn(clientID string, requestID int32) {
 	for biddersLogicalTime[clientID] != requestID-1 {
-		//wait for sequential consistency
+		time.Sleep(time.Millisecond * 500)
 	}
-}
-
-func getIndexOfBidder(bidderID string) int {
-	index := 1
-	for i, _ := range biddersLogicalTime {
-		if i == bidderID {
-			return index
-		}
-		index++
-	}
-	return 0
 }

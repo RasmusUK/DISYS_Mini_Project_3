@@ -19,6 +19,10 @@ message ResultRequest{
   string clientID = 2;
 }
 
+message Empty{
+
+}
+
 message ResultResponse{
   //if active TRUE returns "Auction over client x won with a bid of xxx"
   //else returns current bid amount to be parsed
@@ -29,4 +33,5 @@ message ResultResponse{
 service BidAuctionClientFE{
   rpc SendBidRequest(BidRequest) returns (BidResponse){}
   rpc SendResultRequest(ResultRequest) returns (ResultResponse){}
+  rpc Ping(Empty) returns (Empty){}
 }

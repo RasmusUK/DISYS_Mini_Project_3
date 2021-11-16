@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type BidAuctionClientFEClient interface {
 	SendBidRequest(ctx context.Context, in *BidRequest, opts ...grpc.CallOption) (*BidResponse, error)
 	SendResultRequest(ctx context.Context, in *ResultRequest, opts ...grpc.CallOption) (*ResultResponse, error)
+	Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type bidAuctionClientFEClient struct {
@@ -48,12 +49,22 @@ func (c *bidAuctionClientFEClient) SendResultRequest(ctx context.Context, in *Re
 	return out, nil
 }
 
+func (c *bidAuctionClientFEClient) Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/Proto.BidAuctionClientFE/Ping", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BidAuctionClientFEServer is the server API for BidAuctionClientFE service.
 // All implementations must embed UnimplementedBidAuctionClientFEServer
 // for forward compatibility
 type BidAuctionClientFEServer interface {
 	SendBidRequest(context.Context, *BidRequest) (*BidResponse, error)
 	SendResultRequest(context.Context, *ResultRequest) (*ResultResponse, error)
+	Ping(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedBidAuctionClientFEServer()
 }
 
@@ -66,6 +77,9 @@ func (UnimplementedBidAuctionClientFEServer) SendBidRequest(context.Context, *Bi
 }
 func (UnimplementedBidAuctionClientFEServer) SendResultRequest(context.Context, *ResultRequest) (*ResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendResultRequest not implemented")
+}
+func (UnimplementedBidAuctionClientFEServer) Ping(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedBidAuctionClientFEServer) mustEmbedUnimplementedBidAuctionClientFEServer() {}
 
@@ -116,6 +130,24 @@ func _BidAuctionClientFE_SendResultRequest_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BidAuctionClientFE_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BidAuctionClientFEServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/Proto.BidAuctionClientFE/Ping",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BidAuctionClientFEServer).Ping(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BidAuctionClientFE_ServiceDesc is the grpc.ServiceDesc for BidAuctionClientFE service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -130,6 +162,10 @@ var BidAuctionClientFE_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendResultRequest",
 			Handler:    _BidAuctionClientFE_SendResultRequest_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _BidAuctionClientFE_Ping_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
