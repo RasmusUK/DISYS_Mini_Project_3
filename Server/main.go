@@ -87,7 +87,7 @@ func initServer() {
 }
 
 func auctionTime() {
-	fmt.Println("Auction is started")
+	fmt.Println("Auction has started")
 	time.Sleep(time.Minute * 1)
 	auctionIsActive = false
 	fmt.Println("Auction is done")
