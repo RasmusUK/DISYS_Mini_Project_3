@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,10 @@ var highestBid int32 = 0
 var highestBidder string
 var biddersLogicalTime = make(map[string]int32)
 var auctionIsActive bool = false
+
+var biddersLogicalTimeLock sync.Mutex
+var highestBidLock sync.Mutex
+var highestBidderLock sync.Mutex
 
 func main() {
 	initServer()
@@ -31,35 +36,35 @@ func (s server) Ping(ctx context.Context, empty *gRPC.Empty) (*gRPC.Empty, error
 }
 
 func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*gRPC.BidResponse, error) {
-	if highestBid == 0 {
+	if getHighestBid() == 0 {
 		auctionIsActive = true
 		go auctionTime()
 	}
 	waitForYourTurn(request.ClientID, request.RequestID)
-	biddersLogicalTime[request.ClientID] = request.RequestID
+	setBiddersLogicalTime(request.ClientID, request.RequestID)
 
 	if !auctionIsActive {
 		return &gRPC.BidResponse{Success: false}, errors.New("auction is over")
 	}
 
-	if request.Amount > highestBid {
-		highestBid = request.Amount
-		highestBidder = request.ClientID
+	if setHighestBid(request.Amount) {
+		setHighestBidder(request.ClientID)
 		return &gRPC.BidResponse{Success: true}, nil
 	}
+
 	return &gRPC.BidResponse{Success: false}, nil
 }
 
 func (s server) SendResultRequest(ctx context.Context, request *gRPC.ResultRequest) (*gRPC.ResultResponse, error) {
 	waitForYourTurn(request.ClientID, request.RequestID)
-	biddersLogicalTime[request.ClientID] = request.RequestID
+	setBiddersLogicalTime(request.ClientID, request.RequestID)
 
-	if highestBid == 0 {
+	if getHighestBid() == 0 {
 		return nil, errors.New("no bids has been made")
 	}
 
-	name := highestBidder[:3]
-	result := "Client " + name + " amount: " + strconv.Itoa(int(highestBid))
+	name := getHighestBidder()[:3]
+	result := "Client " + name + " amount: " + strconv.Itoa(int(getHighestBid()))
 
 	return &gRPC.ResultResponse{
 		Result: result,
@@ -94,7 +99,50 @@ func auctionTime() {
 }
 
 func waitForYourTurn(clientID string, requestID int32) {
-	for biddersLogicalTime[clientID] != requestID-1 {
+	for {
+		if getBiddersLogicalTime(clientID) == requestID-1 {
+			break
+		}
 		time.Sleep(time.Millisecond * 500)
 	}
+}
+
+func setBiddersLogicalTime(clientID string, requestID int32) {
+	biddersLogicalTimeLock.Lock()
+	defer biddersLogicalTimeLock.Unlock()
+	biddersLogicalTime[clientID] = requestID
+}
+
+func getBiddersLogicalTime(clientID string) (requestID int32) {
+	biddersLogicalTimeLock.Lock()
+	defer biddersLogicalTimeLock.Unlock()
+	return biddersLogicalTime[clientID]
+}
+
+func getHighestBid() (highest int32) {
+	highestBidLock.Lock()
+	defer highestBidLock.Unlock()
+	return highestBid
+}
+
+func setHighestBid(input int32) (success bool) {
+	highestBidLock.Lock()
+	defer highestBidLock.Unlock()
+	if input > highestBid {
+		highestBid = input
+		return true
+	}
+	return false
+}
+
+func getHighestBidder() (name string) {
+	highestBidLock.Lock()
+	defer highestBidLock.Unlock()
+	return highestBidder
+}
+
+func setHighestBidder(name string) {
+	highestBidderLock.Lock()
+	defer highestBidderLock.Unlock()
+	highestBidder = name
 }
