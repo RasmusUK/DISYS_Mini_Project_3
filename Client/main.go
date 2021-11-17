@@ -4,6 +4,7 @@ import (
 	gRPC "DISYS_Mini_Project_3/gRPC"
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -45,17 +46,23 @@ func findServerAddresses() {
 func pingServer(wg *sync.WaitGroup, address string) {
 	defer wg.Done()
 
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return
 	}
 
-	defer conn.Close()
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			log.Fatalf("Could not close connection")
+		}
+	}(conn)
 
 	c := gRPC.NewBidAuctionClientFEClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+
 	_, err = c.Ping(ctx, &gRPC.Empty{})
 
 	if err == nil {
@@ -79,14 +86,25 @@ func readInputForever() {
 
 func SendResultRequest(wg *sync.WaitGroup, address string) {
 	defer wg.Done()
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := gRPC.NewBidAuctionClientFEClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		removeAddressFromAddresses(address)
+		return
+	}
+
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			log.Fatalf("Could not close connection")
+		}
+	}(conn)
+
+	c := gRPC.NewBidAuctionClientFEClient(conn)
+
 	response, err := c.SendResultRequest(ctx, &gRPC.ResultRequest{
 		RequestID: requestNumber,
 		ClientID:  ID,
@@ -94,9 +112,7 @@ func SendResultRequest(wg *sync.WaitGroup, address string) {
 
 	if err != nil {
 		sendToChannelIfNotFull("No bids have been made")
-	}
-
-	if response.Active {
+	} else if response.Active {
 		sendToChannelIfNotFull(response.Result)
 	} else {
 		sendToChannelIfNotFull("Auction is over:\n" + response.Result)
@@ -105,14 +121,24 @@ func SendResultRequest(wg *sync.WaitGroup, address string) {
 
 func SendBidRequest(wg *sync.WaitGroup, address string, bid int32) {
 	defer wg.Done()
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := gRPC.NewBidAuctionClientFEClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		removeAddressFromAddresses(address)
+		return
+	}
+
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			log.Fatalf("Could not close connection")
+		}
+	}(conn)
+
+	c := gRPC.NewBidAuctionClientFEClient(conn)
 	response, err := c.SendBidRequest(ctx, &gRPC.BidRequest{
 		Amount:    bid,
 		RequestID: requestNumber,
@@ -121,9 +147,7 @@ func SendBidRequest(wg *sync.WaitGroup, address string, bid int32) {
 
 	if err != nil {
 		sendToChannelIfNotFull("Action is closed")
-	}
-
-	if response.Success {
+	} else if response.Success {
 		sendToChannelIfNotFull("Successful bid")
 	} else {
 		sendToChannelIfNotFull("Your bid is too low")
@@ -156,4 +180,21 @@ func sendToChannelIfNotFull(message string) {
 	if len(messageChannel) != 1 {
 		messageChannel <- message
 	}
+}
+
+func removeAddressFromAddresses(address string) {
+	index, err := findIndexOfAddress(address)
+	if err != nil {
+		return
+	}
+	serverAddresses = append(serverAddresses[:index], serverAddresses[index+1:]...)
+}
+
+func findIndexOfAddress(address string) (int, error) {
+	for i := 0; i < len(serverAddresses); i++ {
+		if serverAddresses[i] == address {
+			return i, nil
+		}
+	}
+	return 0, errors.New("could not find address")
 }
