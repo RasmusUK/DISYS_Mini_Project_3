@@ -1,7 +1,7 @@
 package main
 
 import (
-	gRPC "DISYS_Mini_Project_3/gRPC"
+	"DISYS_Mini_Project_3/gRPC"
 	"context"
 	"errors"
 	"fmt"
@@ -16,7 +16,7 @@ import (
 var highestBid int32 = 0
 var highestBidder string
 var biddersLogicalTime = make(map[string]int32)
-var auctionIsActive bool = false
+var auctionIsActive = false
 
 var biddersLogicalTimeLock sync.Mutex
 var highestBidLock sync.Mutex
@@ -31,11 +31,13 @@ type server struct {
 	gRPC.UnsafeBidAuctionClientFEServer
 }
 
-func (s server) Ping(ctx context.Context, empty *gRPC.Empty) (*gRPC.Empty, error) {
+func (s server) Ping(context.Context, *gRPC.Empty) (*gRPC.Empty, error) {
+	log.Println("Received ping")
 	return &gRPC.Empty{}, nil
 }
 
-func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*gRPC.BidResponse, error) {
+func (s server) SendBidRequest(_ context.Context, request *gRPC.BidRequest) (*gRPC.BidResponse, error) {
+	log.Println("Received bid request from:", request.ClientID[:3])
 	if getHighestBid() == 0 {
 		auctionIsActive = true
 		go auctionTime()
@@ -55,7 +57,8 @@ func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*
 	return &gRPC.BidResponse{Success: false}, nil
 }
 
-func (s server) SendResultRequest(ctx context.Context, request *gRPC.ResultRequest) (*gRPC.ResultResponse, error) {
+func (s server) SendResultRequest(_ context.Context, request *gRPC.ResultRequest) (*gRPC.ResultResponse, error) {
+	log.Println("Received result request from:", request.ClientID[:3])
 	waitForYourTurn(request.ClientID, request.RequestID)
 	setBiddersLogicalTime(request.ClientID, request.RequestID)
 
@@ -79,6 +82,7 @@ func initServer() {
 	counter := 10
 	for err != nil && counter < 100 {
 		connectionString := baseString + strconv.Itoa(counter)
+		log.Println("Trying to start server on port:", connectionString)
 		lis, err = net.Listen("tcp", connectionString)
 		counter++
 	}

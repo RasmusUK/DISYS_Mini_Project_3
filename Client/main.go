@@ -1,7 +1,7 @@
 package main
 
 import (
-	gRPC "DISYS_Mini_Project_3/gRPC"
+	"DISYS_Mini_Project_3/gRPC"
 	"bufio"
 	"context"
 	"errors"
@@ -29,6 +29,7 @@ func main() {
 	}
 	fmt.Println("Welcome to the action\nEnter an integer and press enter to make a bid")
 	fmt.Println("Get the status of option by entering r and then press enter")
+	fmt.Println("Your username is: ", ID[:3])
 	readInputForever()
 }
 
@@ -44,6 +45,7 @@ func findServerAddresses() {
 }
 
 func pingServer(wg *sync.WaitGroup, address string) {
+	log.Println("Pinging server:", address)
 	defer wg.Done()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -68,10 +70,11 @@ func pingServer(wg *sync.WaitGroup, address string) {
 	if err == nil {
 		serverAddresses = append(serverAddresses, address)
 	}
+
+	log.Println("Received ping response from:", address)
 }
 
 func readInputForever() {
-
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		line, _, _ := reader.ReadLine()
@@ -79,12 +82,15 @@ func readInputForever() {
 			sendResultRequestToAll()
 		} else if number, err := strconv.Atoi(string(line)); err == nil {
 			sendBidRequestToAll(int32(number))
+		} else {
+			fmt.Println("Invalid input")
 		}
 	}
 
 }
 
 func SendResultRequest(wg *sync.WaitGroup, address string) {
+	log.Println("Send result request to:", address)
 	defer wg.Done()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -92,6 +98,7 @@ func SendResultRequest(wg *sync.WaitGroup, address string) {
 
 	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
+		log.Println(address, "did not respond - deleting from server addresses")
 		removeAddressFromAddresses(address)
 		return
 	}
@@ -110,6 +117,8 @@ func SendResultRequest(wg *sync.WaitGroup, address string) {
 		ClientID:  ID,
 	})
 
+	log.Println("Received result response from:", address)
+
 	if err != nil {
 		sendToChannelIfNotFull("No bids have been made")
 	} else if response.Active {
@@ -120,6 +129,8 @@ func SendResultRequest(wg *sync.WaitGroup, address string) {
 }
 
 func SendBidRequest(wg *sync.WaitGroup, address string, bid int32) {
+	log.Println("Send bid request to:", address)
+
 	defer wg.Done()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -127,6 +138,7 @@ func SendBidRequest(wg *sync.WaitGroup, address string, bid int32) {
 
 	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
+		log.Println(address, "did not respond - deleting from server addresses")
 		removeAddressFromAddresses(address)
 		return
 	}
@@ -139,11 +151,19 @@ func SendBidRequest(wg *sync.WaitGroup, address string, bid int32) {
 	}(conn)
 
 	c := gRPC.NewBidAuctionClientFEClient(conn)
+
+	if err != nil {
+		removeAddressFromAddresses(address)
+		return
+	}
+
 	response, err := c.SendBidRequest(ctx, &gRPC.BidRequest{
 		Amount:    bid,
 		RequestID: requestNumber,
 		ClientID:  ID,
 	})
+
+	log.Println("Received bid response from:", address)
 
 	if err != nil {
 		sendToChannelIfNotFull("Action is closed")
