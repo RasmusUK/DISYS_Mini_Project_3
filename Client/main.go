@@ -19,6 +19,7 @@ var ID string
 var serverAddresses = make([]string, 0)
 var requestNumber int32 = 0
 var messageChannel = make(chan string, 1)
+var serverAddressesLock sync.Mutex
 
 func main() {
 	ID = uuid.New().String()
@@ -68,7 +69,7 @@ func pingServer(wg *sync.WaitGroup, address string) {
 	_, err = c.Ping(ctx, &gRPC.Empty{})
 
 	if err == nil {
-		serverAddresses = append(serverAddresses, address)
+		addAddressToServerAddresses(address)
 	}
 
 	log.Println("Received ping response from:", address)
@@ -217,4 +218,10 @@ func findIndexOfAddress(address string) (int, error) {
 		}
 	}
 	return 0, errors.New("could not find address")
+}
+
+func addAddressToServerAddresses(address string) {
+	serverAddressesLock.Lock()
+	defer serverAddressesLock.Unlock()
+	serverAddresses = append(serverAddresses, address)
 }
