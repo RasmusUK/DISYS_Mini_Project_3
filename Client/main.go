@@ -153,11 +153,6 @@ func SendBidRequest(wg *sync.WaitGroup, address string, bid int32) {
 
 	c := gRPC.NewBidAuctionClientFEClient(conn)
 
-	if err != nil {
-		removeAddressFromAddresses(address)
-		return
-	}
-
 	response, err := c.SendBidRequest(ctx, &gRPC.BidRequest{
 		Amount:    bid,
 		RequestID: requestNumber,
