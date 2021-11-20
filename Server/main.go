@@ -14,10 +14,11 @@ import (
 
 var highestBid int32 = 0
 var highestBidder string
-var biddersLogicalTime map[string]int32
 var auctionIsActive bool = false
+var biddersLogicalTime map[string]int32
 
 func main() {
+	biddersLogicalTime = make(map[string]int32)
 	input := readArgs()
 	initServer(input)
 }
@@ -35,18 +36,24 @@ type server struct {
 }
 
 func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*gRPC.BidResponse, error) {
+	log.Printf("Receive bid request from client: %s", request.ClientID)
 	if highestBid == 0 {
 		auctionIsActive = true
 		go auctionTime()
+		log.Printf("action is now active")
 	}
 
+	log.Printf("Before wait for your turn method")
 	waitForYourTurn(request.ClientID, request.RequestID)
+	log.Printf("After wait for your turn method")
+	log.Printf("%v", biddersLogicalTime[request.ClientID])
 
 	if !auctionIsActive {
 		return &gRPC.BidResponse{Success: false}, errors.New("auction is over")
 	}
 
 	biddersLogicalTime[request.ClientID] = request.RequestID
+	log.Printf("Server before checking amount")
 
 	if request.Amount > highestBid {
 		highestBid = request.Amount
@@ -86,14 +93,17 @@ func initServer(connectionString string) {
 }
 
 func auctionTime() {
-	time.Sleep(time.Minute * 2)
+	time.Sleep(time.Second * 30)
 	auctionIsActive = false
+	log.Printf("Auction is now over")
 }
 
 func waitForYourTurn(clientID string, requestID int32) {
+	log.Printf("Start of wait for your turn method")
 	for biddersLogicalTime[clientID] != requestID-1 {
 		//wait for sequential consistency
 	}
+	log.Printf("End of wait for your turn method")
 }
 
 func getIndexOfBidder(bidderID string) int {
