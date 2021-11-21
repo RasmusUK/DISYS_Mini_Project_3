@@ -2,17 +2,30 @@ package main
 
 import (
 	DISYS "DISYS_Mini_Project_3/gRPC"
+	"bufio"
 	"context"
+	"fmt"
+	"os"
+
 	//"errors"
 	"google.golang.org/grpc"
 	"log"
 	//"net"
 	//"os"
-	//"strconv"
+	"strconv"
 	//"time"
 )
 
+var logicalClock int32 = 1
+
 func main() {
+
+	log.Printf("Welcome to the Auction house")
+	readInput()
+
+}
+
+func bid(amount int32) {
 	conn, err := grpc.Dial("localhost:8100", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("client failed to connect to server")
@@ -20,28 +33,55 @@ func main() {
 	defer conn.Close()
 
 	c := DISYS.NewBidAuctionClientFEClient(conn)
-	log.Printf("Client is now connected to server")
 
-	response, err := c.SendBidRequest(context.Background(), &DISYS.BidRequest{Amount: 1, RequestID: 1, ClientID: "My"})
+	response, err := c.SendBidRequest(context.Background(), &DISYS.BidRequest{Amount: amount, RequestID: logicalClock, ClientID: "My"})
 	if err != nil {
 		log.Fatalf("Error when calling BidRequest: %s", err)
 	}
-	log.Printf("test if we get here")
-	log.Printf("Response from server: %s", response.Success)
 
-	resultReq, err := c.SendResultRequest(context.Background(), &DISYS.ResultRequest{RequestID: 2, ClientID: "My"})
+	log.Printf("Response from server: %s", response.Success)
+	logicalClock++
+}
+
+func result() {
+	conn, err := grpc.Dial("localhost:8100", grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("client failed to connect to server")
+	}
+	defer conn.Close()
+
+	c := DISYS.NewBidAuctionClientFEClient(conn)
+
+	resultReq, err := c.SendResultRequest(context.Background(), &DISYS.ResultRequest{RequestID: logicalClock, ClientID: "My"})
 	if err != nil {
 		log.Fatalf("Error when calling ResultRequest: %v", err)
 	}
 
-	log.Printf("Result response from server: %s", resultReq.Result)
+	if resultReq.Active {
+		log.Printf("Highest bidder: %s", resultReq.Result)
+	} else {
+		log.Printf("Auction is over, the winner is: %s", resultReq.Result)
+	}
 
+	logicalClock++
 }
 
-func bid() {
-	panic("implement me")
-}
+func readInput() {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		line, _, _ := reader.ReadLine()
+		if string(line) == "bid" {
+			fmt.Println("Enter bid amount:")
+			var amount string
+			fmt.Scanln(&amount)
+			temp, _ := strconv.ParseInt(amount, 10, 32)
 
-func result() {
-	panic("implement me")
+			bid(int32(temp))
+		} else if string(line) == "result" {
+			result()
+		} else {
+			log.Printf("Invalid input.")
+		}
+
+	}
 }

@@ -4,6 +4,7 @@ import (
 	gRPC "DISYS_Mini_Project_3/gRPC"
 	"context"
 	"errors"
+	"fmt"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -36,24 +37,20 @@ type server struct {
 }
 
 func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*gRPC.BidResponse, error) {
-	log.Printf("Receive bid request from client: %s", request.ClientID)
+	log.Printf("Receive bid request from client: %s, with amount: %s", request.ClientID, fmt.Sprint(request.Amount))
 	if highestBid == 0 {
 		auctionIsActive = true
 		go auctionTime()
 		log.Printf("action is now active")
 	}
 
-	log.Printf("Before wait for your turn method")
 	waitForYourTurn(request.ClientID, request.RequestID)
-	log.Printf("After wait for your turn method")
-	log.Printf("%v", biddersLogicalTime[request.ClientID])
 
 	if !auctionIsActive {
 		return &gRPC.BidResponse{Success: false}, errors.New("auction is over")
 	}
 
 	biddersLogicalTime[request.ClientID] = request.RequestID
-	log.Printf("Server before checking amount")
 
 	if request.Amount > highestBid {
 		highestBid = request.Amount
@@ -65,13 +62,14 @@ func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*
 
 func (s server) SendResultRequest(ctx context.Context, request *gRPC.ResultRequest) (*gRPC.ResultResponse, error) {
 	waitForYourTurn(request.ClientID, request.RequestID)
+	biddersLogicalTime[request.ClientID] = request.RequestID
 
 	if highestBid == 0 {
 		return nil, errors.New("no bids has been made")
 	}
 
 	index := getIndexOfBidder(highestBidder)
-	result := "Client " + strconv.Itoa(index) + "amount: " + strconv.Itoa(int(highestBid))
+	result := "Client " + strconv.Itoa(index) + " with amount: " + strconv.Itoa(int(highestBid))
 
 	return &gRPC.ResultResponse{
 		Result: result,
@@ -99,11 +97,9 @@ func auctionTime() {
 }
 
 func waitForYourTurn(clientID string, requestID int32) {
-	log.Printf("Start of wait for your turn method")
 	for biddersLogicalTime[clientID] != requestID-1 {
 		//wait for sequential consistency
 	}
-	log.Printf("End of wait for your turn method")
 }
 
 func getIndexOfBidder(bidderID string) int {
