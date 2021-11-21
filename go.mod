@@ -3,6 +3,7 @@ module DISYS_Mini_Project_3
 go 1.17
 
 require (
+	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	google.golang.org/grpc v1.42.0
 	google.golang.org/protobuf v1.27.1
 )
