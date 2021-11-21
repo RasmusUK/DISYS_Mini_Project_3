@@ -39,7 +39,12 @@ func bid(amount int32) {
 		log.Fatalf("Error when calling BidRequest: %s", err)
 	}
 
-	log.Printf("Response from server: %s", response.Success)
+	if response.Success {
+		log.Printf("Bid was accepted")
+	} else {
+		log.Printf("Bid too low - try again")
+	}
+
 	logicalClock++
 }
 

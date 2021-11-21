@@ -47,7 +47,8 @@ func (s server) SendBidRequest(ctx context.Context, request *gRPC.BidRequest) (*
 	waitForYourTurn(request.ClientID, request.RequestID)
 
 	if !auctionIsActive {
-		return &gRPC.BidResponse{Success: false}, errors.New("auction is over")
+		message := fmt.Sprintf("Auction is over. Winner was %s with %s", highestBidder, fmt.Sprint(highestBid))
+		return &gRPC.BidResponse{Success: false}, errors.New(message)
 	}
 
 	biddersLogicalTime[request.ClientID] = request.RequestID
