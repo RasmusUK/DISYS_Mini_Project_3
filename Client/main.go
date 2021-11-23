@@ -5,7 +5,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	UUID "github.com/nu7hatch/gouuid"
+	"github.com/google/uuid"
 	"os"
 
 	//"errors"
@@ -18,10 +18,11 @@ import (
 )
 
 var logicalClock int32 = 1
+var clientID string
 
 func main() {
-	clientID, err :=
-		log.Printf("Welcome to the Auction house")
+	clientID = uuid.New().String()
+	log.Printf("Welcome to the Auction house")
 	readInput()
 
 }
@@ -29,7 +30,7 @@ func main() {
 func bid(amount int32) {
 	conn1, err := grpc.Dial("localhost:8100", grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("client failed to connect to server")
+		log.Printf("client failed to connect to server")
 	}
 	defer conn1.Close()
 
@@ -37,7 +38,7 @@ func bid(amount int32) {
 
 	conn2, err := grpc.Dial("localhost:8200", grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("client failed to connect to server")
+		log.Printf("client failed to connect to server")
 	}
 	defer conn2.Close()
 
@@ -45,23 +46,23 @@ func bid(amount int32) {
 
 	conn3, err := grpc.Dial("localhost:8300", grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("client failed to connect to server")
+		log.Printf("client failed to connect to server")
 	}
 	defer conn3.Close()
 
 	c3 := DISYS.NewBidAuctionClientFEClient(conn3)
 
-	response1, err := c1.SendBidRequest(context.Background(), &DISYS.BidRequest{Amount: amount, RequestID: logicalClock, ClientID: "My"})
+	response1, err := c1.SendBidRequest(context.Background(), &DISYS.BidRequest{Amount: amount, RequestID: logicalClock, ClientID: clientID})
 	if err != nil {
 		log.Fatalf("Error when calling BidRequest: %s", err)
 	}
 
-	response2, err := c2.SendBidRequest(context.Background(), &DISYS.BidRequest{Amount: amount, RequestID: logicalClock, ClientID: "My"})
+	response2, err := c2.SendBidRequest(context.Background(), &DISYS.BidRequest{Amount: amount, RequestID: logicalClock, ClientID: clientID})
 	if err != nil {
 		log.Fatalf("Error when calling BidRequest: %s", err)
 	}
 
-	response3, err := c3.SendBidRequest(context.Background(), &DISYS.BidRequest{Amount: amount, RequestID: logicalClock, ClientID: "My"})
+	response3, err := c3.SendBidRequest(context.Background(), &DISYS.BidRequest{Amount: amount, RequestID: logicalClock, ClientID: clientID})
 	if err != nil {
 		log.Fatalf("Error when calling BidRequest: %s", err)
 	}
@@ -111,7 +112,7 @@ func bid(amount int32) {
 	logicalClock++
 }
 
-func result(clientID *UUID.UUID) {
+func result() {
 	conn, err := grpc.Dial("localhost:8100", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("client failed to connect to server")
@@ -120,7 +121,7 @@ func result(clientID *UUID.UUID) {
 
 	c := DISYS.NewBidAuctionClientFEClient(conn)
 
-	resultReq, err := c.SendResultRequest(context.Background(), &DISYS.ResultRequest{RequestID: logicalClock, ClientID: UUID.String(clientID)})
+	resultReq, err := c.SendResultRequest(context.Background(), &DISYS.ResultRequest{RequestID: logicalClock, ClientID: clientID})
 	if err != nil {
 		log.Fatalf("Error when calling ResultRequest: %v", err)
 	}
@@ -134,7 +135,7 @@ func result(clientID *UUID.UUID) {
 	logicalClock++
 }
 
-func readInput(clientID *UUID.UUID) {
+func readInput() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		line, _, _ := reader.ReadLine()
@@ -144,9 +145,9 @@ func readInput(clientID *UUID.UUID) {
 			fmt.Scanln(&amount)
 			temp, _ := strconv.ParseInt(amount, 10, 32)
 
-			bid(int32(temp), clientID)
+			bid(int32(temp))
 		} else if string(line) == "result" {
-			result(clientID)
+			result()
 		} else {
 			log.Printf("Invalid input.")
 		}
