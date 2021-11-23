@@ -11,7 +11,7 @@
 go run .
 ```
 
-- You should open atleast two to try and crash one of them by closing the terminal window or clicking Crtl + C on
+- You should open at least two to try and crash one of them by closing the terminal window or clicking Crtl + C on
   Windows.
 
 ### Run clients
@@ -31,7 +31,7 @@ go run .
 ## Good to know
 
 - The action will start when the first bid is made.
-- The action will last 1 minut.
+- The action will last 1 minute.
 - Make sure to start all the servers first as the clients will ping the servers and find all the available servers.
 - You cannot start a new auction. You must kill all the processes and run them again.
 
