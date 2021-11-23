@@ -33,4 +33,5 @@ go run .
 - The action will start when the first bid is made.
 - The action will last 1 minut.
 - Make sure to start all the servers first as the clients will ping the servers and find all the available servers.
+- You cannot start a new auction. You must kill all the processes and run them again.
 
